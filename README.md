@@ -4,7 +4,7 @@ Put your AI agent on FaceTime, with a voice and a moving avatar.
 
 The idea is simple: a browser joins your FaceTime link as a guest. Instead of sending your laptop's microphone and webcam, it sends your agent's speech and avatar. Your voice travels back to the agent so you can have a conversation from your iPhone.
 
-**Status: synthetic-media spike.** The ordinary Chrome guest joined successfully on the available Mac. Generated video and speech plus an incoming-audio meter are implemented and pass a local WebRTC check. In the first live Mac test, the user confirmed moving video and clear generated speech on the iPhone. The receive-audio meter responded, and Stop closed Chrome and removed its temporary profile. Caller-speech intelligibility at the adapter still needs a separate check. The standalone LiveKit test participant connected successfully, but FaceTime’s Content Security Policy blocks the direct-in-tab LiveKit connection. The implementation now uses a separate local connector and WebRTC hop; local tests pass and the hop connects to the actual FaceTime page. In a supervised live test, the user confirmed video and speech on the iPhone and caller speech returning to the LiveKit test participant. Both test sessions stopped successfully. One disconnection required a manual rejoin; reliability is not established. The AI agent is not built yet. This is an unofficial project, not an Apple-supported integration.
+**Status: synthetic-media spike.** The ordinary Chrome guest joined successfully on the available Mac. Generated video and speech plus an incoming-audio meter are implemented and pass a local WebRTC check. In the first live Mac test, the user confirmed moving video and clear generated speech on the iPhone. The receive-audio meter responded, and Stop closed Chrome and removed its temporary profile. Caller-speech intelligibility at the adapter still needs a separate check. The standalone LiveKit test participant connected successfully, but FaceTime’s Content Security Policy blocks the direct-in-tab LiveKit connection. The implementation now uses a separate local connector and WebRTC hop; local tests pass and the hop connects to the actual FaceTime page. In a supervised live test, the user confirmed video and speech on the iPhone and caller speech returning to the LiveKit test participant. Both test sessions stopped successfully. One disconnection required a manual rejoin; reliability is not established. A local OpenAI Realtime agent and simple speaking avatar are now implemented; a supervised live conversation and interruptions were confirmed by the user. Stop closed the browser and automatically shut down the agent. This is an unofficial project, not an Apple-supported integration.
 
 ## Run the first check
 
@@ -52,6 +52,20 @@ Then use two terminals, with Node 22 selected in each:
 The FaceTime tab publishes a mix of its incoming audio tracks as `facetime-caller`; this spike assumes one human caller. It accepts room output only from the configured test participant. Room media uses separate audio routes and bypasses the FaceTime peer observer to prevent feedback. No AI agent or recording is involved.
 
 **Prototype credential boundary:** the room token runs only in the local connector page. The FaceTime page gets media and signaling, not that token. Use a disposable test room. Keep API secrets out of page scripts, command arguments, and committed files. For an existing token, use the same three fields as the generated config: `url`, `token`, and `targetIdentity`; tokens must expire within one hour and explicitly allow room join, publish, and subscribe.
+
+## Talk to the agent
+
+The first agent runs locally with OpenAI Realtime. Its model API key never enters Chrome. Conversation audio is sent to OpenAI; local recordings and transcript publication are disabled. Provider-side data handling is governed by your OpenAI account settings.
+
+1. Run `npm run agent:setup` and enter your OpenAI API key at the hidden prompt. It is saved only in ignored `.local/openai.json`.
+2. If the room tokens have expired, run `npm run tokens` again. The agent uses `.local/peer.json` in place of the test participant, so **do not run `npm run peer` at the same time**.
+3. Run `npm run agent` in one terminal, then `npm run livekit` in another. Paste the FaceTime link, join in Chrome, and admit the guest on the iPhone.
+4. After admission, click **Connect LiveKit** in the local connector tab. The agent starts its model session when the caller-audio track arrives, greets you, and accepts conversation and interruptions.
+5. Stop the browser test to disconnect the connector and end the agent. You can also press Ctrl+C in the agent terminal. The agent has a ten-minute total test limit, including time waiting for the connector.
+
+Edit [examples/agent.json](examples/agent.json) to change the prompt, voice, model, or test duration. The default is [gpt-realtime-1.5](https://developers.openai.com/api/docs/models/gpt-realtime-1.5) with the `marin` voice. The procedural face reacts to speaking state; it is not a lip-synced avatar. This example uses room-scoped credentials directly and does not require an agent deployment or dispatch service.
+
+`npm run agent:check` initializes the SDK and native avatar frames without calling LiveKit or OpenAI. The first supervised conversation, interruption, and Stop check passed. This is prototype feasibility evidence, not a production reliability guarantee.
 
 ## What you would build
 

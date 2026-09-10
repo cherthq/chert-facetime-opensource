@@ -69,3 +69,7 @@ Implementation references: [Apple guest flow](https://support.apple.com/en-ca/10
 ## Latest live result
 
 The separate connector path passed a supervised test on the Mac: test participant → LiveKit → connector → FaceTime → iPhone delivered visible video and intelligible canned speech; iPhone speech returned through the same path to the test participant and was heard through the Mac. Both Stop controls completed cleanup. One disconnection required manual rejoining and its cause is not established. The next implementation step is a real agent; no agent has been connected yet.
+
+## Agent implementation in progress
+
+A local Node LiveKit agent now uses OpenAI Realtime with a configurable prompt and voice plus an original state-driven animated face. It reuses the test participant’s room-scoped token; the OpenAI key stays in ignored local configuration. It waits for the connector audio publication before model startup, disables recording and transcript publication, and ends on connector departure or a bounded test timer. Native SDK/avatar initialization passed offline, and the agent connected to the test room. Live acceptance passed in a supervised call: the user confirmed conversation and successful interruptions. Pressing Stop test closed the browser session and removed its temporary profile; the agent detected connector departure, printed “Agent stopped,” and exited successfully. This confirms the complete initial agent flow, not unattended reliability.
