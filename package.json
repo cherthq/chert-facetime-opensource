@@ -1,0 +1,15 @@
+{
+  "name": "chert-facetime-guest-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/launch.mjs",
+    "check": "node --check src/launch.mjs && node --check src/media.mjs",
+    "test": "node tests/media.mjs",
+    "synthetic": "node src/launch.mjs --synthetic",
+    "smoke": "node src/launch.mjs --smoke"
+  },
+  "dependencies": { "playwright": "1.63.0" }
+}
