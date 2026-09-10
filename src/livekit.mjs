@@ -98,13 +98,19 @@ export function installLiveKit(config, testPeer = false) {
       show(blockedByPolicy ? 'Page security policy blocks LiveKit. A separate connector is required.' : 'Connection failed: check room URL, token expiry and grants; restart to retry');
     }
   }
+  let connecting;
+  const connectOnce = () => connecting ??= connect();
+  Object.defineProperty(window, '__chertRoom', { value: {
+    connect: connectOnce,
+    status: () => ({ roomConnected: room.state === 'connected' && !ended, audio: selected.has('audio'), video: selected.has('video') }),
+  } });
   function panel() {
     const host = document.createElement('div');
     host.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;background:white;color:#102834;padding:14px;border:2px solid #17846b;border-radius:12px;font:13px system-ui;max-width:300px';
     const title = document.createElement('strong');
     title.textContent = testPeer ? 'LiveKit test participant' : 'FaceTime ↔ LiveKit';
     label = document.createElement('p'); label.textContent = state;
-    const join = document.createElement('button'); join.textContent = 'Connect LiveKit'; join.onclick = () => { void connect(); };
+    const join = document.createElement('button'); join.textContent = 'Connect LiveKit'; join.onclick = () => { void connectOnce(); };
     host.append(title, label, join);
     if (testPeer) {
       const listen = document.createElement('button'); listen.textContent = 'Listen to caller';

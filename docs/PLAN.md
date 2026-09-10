@@ -73,3 +73,15 @@ The separate connector path passed a supervised test on the Mac: test participan
 ## Agent implementation in progress
 
 A local Node LiveKit agent now uses OpenAI Realtime with a configurable prompt and voice plus an original state-driven animated face. It reuses the test participant’s room-scoped token; the OpenAI key stays in ignored local configuration. It waits for the connector audio publication before model startup, disables recording and transcript publication, and ends on connector departure or a bounded test timer. Native SDK/avatar initialization passed offline, and the agent connected to the test room. Live acceptance passed in a supervised call: the user confirmed conversation and successful interruptions. Pressing Stop test closed the browser session and removed its temporary profile; the agent detected connector departure, printed “Agent stopped,” and exited successfully. This confirms the complete initial agent flow, not unattended reliability.
+
+## npm CLI and SDK packaging — September 10, 2026
+
+The user approved both entry points under `@trychert/facetime-opensource` and selected Apache-2.0. `FaceTimeGuest` owns browser startup, room connection, status, and cleanup; the CLI uses that same SDK and prompts privately for the room token and FaceTime link. Human Join and admission remain required. Existing diagnostic/starter commands remain available from the repository.
+
+The npm artifact includes only the connector, declarations, bundled browser LiveKit client, README, Apache license, and bundled third-party notices. `playwright-core` is the sole installed runtime dependency; users supply Chrome. Agent/model dependencies, local credentials, test speech, tests, and setup tools are excluded.
+
+Local acceptance covers opening both tabs against an offline FaceTime fixture, the native media hop, room-client isolation from the FaceTime page, shutdown through SDK and Stop, temporary-profile removal, CLI help, and installing the tarball into an empty project without development dependencies. These checks do not contact FaceTime or LiveKit. The prior live conversation validates the media approach; it does not establish a live result for the new packaged launcher.
+
+The full local check suite passed: syntax, media, LiveKit routing, local hop, SDK lifecycle, starter initialization, and clean package installation.
+
+Remaining release steps: run a supervised call with the packaged CLI when the user is ready, authenticate npm for the `trychert` organization, and publish version 0.1.0 as an experimental public package. Publishing has not occurred. Longer-call reliability, recovery, other platforms, and arbitrary external agent compatibility remain unverified.

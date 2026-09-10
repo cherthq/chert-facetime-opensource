@@ -20,13 +20,106 @@ Your iPhone ↔ Browser guest + connector ↔ LiveKit room ↔ Your AI agent
 
 We include a starter agent so you can try the whole experience. [examples/agent.json](examples/agent.json) only customizes **that starter**. If you already build LiveKit agents, keep your own agent code and configure it however you normally do.
 
+## CLI or SDK: use your existing agent
+
+**Version 0.1.0 is published as [@trychert/facetime-opensource](https://www.npmjs.com/package/@trychert/facetime-opensource)**, licensed under [Apache-2.0](LICENSE). You can use the connector without cloning this repository or manually editing configuration files.
+
+**Same package, two ways to use it:**
+
+- **CLI (`npx`):** run the connector directly in your terminal and answer its prompts. No coding needed.
+- **SDK (`npm install`):** add the connector to your JavaScript project. Your code controls when it opens, connects, and stops. Installing it alone starts nothing.
+
+Both run on your computer and open Chrome. Your LiveKit agent runs separately; **we only connect it to FaceTime**. Neither option hosts or starts your agent, automatically dials someone, or bypasses human admission.
+
+You need **Node 22.22+, installed Google Chrome, an iPhone, and your own running LiveKit agent**. The browser path has been tested on macOS; other platforms are unverified. Keep your laptop running during the call.
+
+### 1. CLI: the easiest setup
+
+Run:
+
+```sh
+npx @trychert/facetime-opensource
+```
+
+It asks for:
+
+```text
+LiveKit server URL:
+Room token: [hidden]
+Agent participant identity:
+FaceTime link: [hidden]
+```
+
+Then it opens Chrome and guides you through joining, admission, and connecting:
+
+1. Run or deploy your agent and have it join a LiveKit room. Your existing backend handles agent dispatch if needed.
+2. Run the command. Enter your LiveKit WebSocket URL, a short-lived connector participant token, and your agent's **participant identity**. This identity is not an agent deployment name.
+3. Create a FaceTime link on your iPhone and paste it at the hidden prompt.
+4. Click **Join** in the Chrome window and admit the browser guest on your iPhone.
+5. Return to the terminal and press **Enter** to connect LiveKit. Talk to your agent through FaceTime.
+6. Press **Enter**, **Ctrl+C**, or **Stop test** to close the connector. Your independently hosted agent remains under your control.
+
+Give the connector a different participant identity from the agent, in the **same room**. Its token must explicitly allow room join, publishing, and subscribing, and expire within one hour. The agent should consume `facetime-caller` audio and publish its speech and, optionally, avatar video. Without avatar video, the waiting graphic remains. Compatibility with arbitrary third-party agents still needs testing.
+
+The prompts hide the token and FaceTime link; the CLI does not save them. You can also supply an existing JSON file with `url`, `token`, and `targetIdentity` using `--config ./livekit.json`. Keep that file private and out of Git. Do not pass tokens or FaceTime links as command arguments.
+
+**Use it from this checkout now:**
+
+```sh
+nvm use
+npm ci
+npm run build
+npm run cli
+# Or reuse the local token helper's configuration:
+npm run cli -- --config .local/livekit.json
+```
+
+Choose one launch command. Our repository's `npm run tokens` creates tokens for the starter/test participant; bring your own matching room token when using an existing agent.
+
+### 2. SDK: integrate it into your code
+
+Install it in your Node project:
+
+```sh
+npm install @trychert/facetime-opensource
+```
+
+Save this as an `.mjs` file. Supply the three credentials/link values from your application's private configuration; never put real values in committed source.
+
+```js
+import { FaceTimeGuest } from '@trychert/facetime-opensource';
+import { createInterface } from 'node:readline/promises';
+
+const terminal = createInterface({ input: process.stdin, output: process.stdout });
+let guest;
+try {
+  guest = await FaceTimeGuest.open({
+    faceTimeLink: process.env.FACETIME_LINK,
+    livekitUrl: process.env.LIVEKIT_URL,
+    roomToken: process.env.LIVEKIT_ROOM_TOKEN,
+    agentIdentity: 'my-agent', // Exact participant identity in your room.
+  });
+  await terminal.question('Join in Chrome and admit on your iPhone, then press Enter.');
+  await guest.connect();
+  terminal.close();
+  await guest.closed; // Click Stop test or close the browser when finished.
+} finally {
+  terminal.close();
+  await guest?.close();
+}
+```
+
+`open()` prepares the browser and media link; `connect()` joins LiveKit after human admission. `status()` reports connection/publication state, and `close()` shuts down the owned browser and removes its temporary profile. Pass an `AbortSignal` to `open()` to connect cancellation to your application. Importing the SDK alone starts nothing. TypeScript declarations are included; the package uses ESM.
+
+The package bundles the browser LiveKit client and depends on `playwright-core` to operate your installed Chrome. It does not install Chrome, host an agent, or include the optional OpenAI starter and speech fixtures. The new packaged entry points passed offline browser and clean-install checks; their full FaceTime flow still needs a supervised call.
+
 ## How this works
 
 The connector has **four core files**:
 
 | File | Simple explanation |
 | --- | --- |
-| `src/launch.mjs` | **Starts and stops everything in the browser.** Opens the FaceTime tab and the local connector tab. |
+| `src/sdk.mjs` | **Starts and stops everything in the browser.** Opens the FaceTime tab and the local connector tab. |
 | `src/media.mjs` | **Supplies the agent’s video and speech instead of your webcam and microphone**, and receives the caller’s audio. |
 | `src/hop.mjs` | **Connects the two tabs.** Carries media between FaceTime and the local connector because FaceTime blocks direct LiveKit connections. |
 | `src/livekit.mjs` | **Connects to the agent’s room.** Sends caller audio into LiveKit and receives the agent’s speech and video. |
@@ -47,7 +140,7 @@ Your agent
 
 The agent’s speech and video travel back along the same path.
 
-`launch.mjs` opens this setup and closes it when you press Stop. One supporting file, `bundle.mjs`, packages the code that runs inside the tabs.
+`sdk.mjs` opens this setup and closes it when you press Stop. `cli.mjs` gives it a terminal interface. `scripts/build.mjs` packages the browser LiveKit code for npm. The older `launch.mjs` and `bundle.mjs` remain for the repository’s starter and diagnostic commands.
 
 **The agent is separate.** Our optional `examples/agent.mjs` listens and answers using OpenAI, while `examples/avatar.mjs` draws its moving face. An experienced developer can supply their own agent instead.
 
@@ -149,10 +242,11 @@ Edit [examples/agent.json](examples/agent.json) to change the prompt, voice, mod
 
 | Folder | What belongs here |
 | --- | --- |
-| `src/` | The browser connector, media routing, and browser bundling. |
+| `src/` | The SDK, CLI, configuration checks, browser connector, and media routing. |
+| `dist/` | Generated browser bundle and third-party license notices shipped with npm. |
 | `examples/` | The optional starter agent, animated face, and `agent.json` settings. |
-| `scripts/` | Local setup helpers for LiveKit tokens and the OpenAI key. |
-| `tests/` | Local checks for media, room routing, and the link between tabs. |
+| `scripts/` | Credential setup helpers, package build, and clean-install verification. |
+| `tests/` | Offline checks for media, room routing, the link between tabs, and SDK cleanup. |
 | `assets/` | The canned speech fixture and its provenance. |
 | `docs/` | The implementation plan, test results, and original project brief. |
 
@@ -160,6 +254,6 @@ Package files and Node/Git settings stay at the root. Credentials stay in ignore
 
 ## What's next
 
-Simplify startup, investigate the earlier disconnection, and test longer calls and recovery. Before wider sharing, review the license, dependencies, secrets, and setup documentation.
+Complete a supervised call through the new CLI/SDK entry point, investigate the earlier disconnection, and test longer calls and recovery. Run `npm run check:package` to build and verify a clean installation without placing calls.
 
 See [PLAN.md](docs/PLAN.md) for the implementation details and observed results.

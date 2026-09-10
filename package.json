@@ -1,15 +1,14 @@
 {
-  "name": "chert-facetime-guest-spike",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@trychert/facetime-opensource",
+  "version": "0.1.0",
   "type": "module",
   "engines": {
     "node": ">=22.22"
   },
   "scripts": {
     "start": "node src/launch.mjs",
-    "check": "node --check src/launch.mjs && node --check src/media.mjs && node --check src/livekit.mjs && node --check scripts/token.mjs && node --check src/bundle.mjs && node --check src/hop.mjs && node --check examples/agent.mjs && node --check examples/avatar.mjs && node --check scripts/agent-setup.mjs",
-    "test": "node tests/media.mjs && node tests/livekit.mjs && node tests/hop.mjs",
+    "check": "node --check src/launch.mjs && node --check src/media.mjs && node --check src/livekit.mjs && node --check scripts/token.mjs && node --check src/bundle.mjs && node --check src/hop.mjs && node --check examples/agent.mjs && node --check examples/avatar.mjs && node --check scripts/agent-setup.mjs && node --check src/sdk.mjs && node --check src/cli.mjs && node --check src/config.mjs",
+    "test": "node tests/media.mjs && node tests/livekit.mjs && node tests/hop.mjs && node tests/sdk.mjs",
     "synthetic": "node src/launch.mjs --synthetic",
     "smoke": "node src/launch.mjs --smoke",
     "tokens": "node scripts/token.mjs",
@@ -17,9 +16,19 @@
     "peer": "node src/launch.mjs --peer",
     "agent:setup": "node scripts/agent-setup.mjs",
     "agent": "node examples/agent.mjs",
-    "agent:check": "node examples/agent.mjs --check"
+    "agent:check": "node examples/agent.mjs --check",
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build",
+    "cli": "node src/cli.mjs",
+    "test:sdk": "node tests/sdk.mjs",
+    "pretest": "npm run build",
+    "check:package": "npm run build && node scripts/check-package.mjs"
   },
   "dependencies": {
+    "playwright-core": "1.63.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
     "@livekit/agents": "1.8.0",
     "@livekit/agents-plugin-openai": "1.8.0",
     "@livekit/rtc-node": "0.13.35",
@@ -27,10 +36,35 @@
     "livekit-server-sdk": "2.19.0",
     "playwright": "1.63.0"
   },
-  "devDependencies": {
-    "esbuild": "0.28.2"
-  },
   "overrides": {
     "sharp": "0.35.4"
+  },
+  "description": "Connect your LiveKit agent to a supervised FaceTime browser guest.",
+  "license": "Apache-2.0",
+  "bin": {
+    "facetime-opensource": "./src/cli.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/sdk.mjs"
+    }
+  },
+  "types": "./src/index.d.ts",
+  "files": [
+    "src/sdk.mjs",
+    "src/cli.mjs",
+    "src/index.d.ts",
+    "src/config.mjs",
+    "src/media.mjs",
+    "src/hop.mjs",
+    "dist/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/garygao333/chert-facetime-opensource.git"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
