@@ -3,13 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=22.22"
+  },
   "scripts": {
     "start": "node src/launch.mjs",
-    "check": "node --check src/launch.mjs && node --check src/media.mjs",
-    "test": "node tests/media.mjs",
+    "check": "node --check src/launch.mjs && node --check src/media.mjs && node --check src/livekit.mjs && node --check src/token.mjs && node --check src/bundle.mjs && node --check src/hop.mjs",
+    "test": "node tests/media.mjs && node tests/livekit.mjs && node tests/hop.mjs",
     "synthetic": "node src/launch.mjs --synthetic",
-    "smoke": "node src/launch.mjs --smoke"
+    "smoke": "node src/launch.mjs --smoke",
+    "tokens": "node src/token.mjs",
+    "livekit": "node src/launch.mjs --livekit",
+    "peer": "node src/launch.mjs --peer"
   },
-  "dependencies": { "playwright": "1.63.0" }
+  "dependencies": {
+    "livekit-client": "2.22.3",
+    "livekit-server-sdk": "2.19.0",
+    "playwright": "1.63.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
 }

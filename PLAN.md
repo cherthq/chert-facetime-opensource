@@ -4,7 +4,7 @@
 
 On the Mac we already have, prove that a visible Chrome tab can join a FaceTime link as a guest, send generated video and canned speech, and receive the caller's audio digitally.
 
-This replaces the longer implementation roadmap. **First live result — September 10, 2026:** the Chrome guest joined on the Mac, and the user confirmed seeing the animated face and hearing the generated phrase on the iPhone. Incoming audio tracks and a nonzero receive meter were observed; caller-speech intelligibility at the adapter has not been separately confirmed. Clicking Stop closed the guest browser, exited the launcher successfully, and removed its temporary profile. The local WebRTC test also passed media teardown. This is one successful supervised trial, not a reliability claim. No LiveKit connection is built yet.
+This replaces the longer implementation roadmap. **First live result — September 10, 2026:** the Chrome guest joined on the Mac, and the user confirmed seeing the animated face and hearing the generated phrase on the iPhone. Incoming audio tracks and a nonzero receive meter were observed; caller-speech intelligibility at the adapter has not been separately confirmed. Clicking Stop closed the guest browser, exited the launcher successfully, and removed its temporary profile. The local WebRTC test also passed media teardown. This is one successful supervised trial, not a reliability claim. LiveKit wiring and a controlled test participant are implemented. Local tests passed. In the real room test, the standalone participant connected successfully, but FaceTime blocked the in-tab LiveKit connection through its connect-src Content Security Policy; Chrome policy errors confirmed the block. Both test sessions were stopped and their temporary profiles removed. Direct-in-tab LiveKit is blocked on this client. The user approved a separate local connector plus WebRTC media link. It is implemented and passes local two-origin tests for video, both audio directions, no output-to-input loop, and Stop. The hop also established between the actual FaceTime page and the local connector without disabling CSP. After explicit iPhone admission and one manual rejoin following a reported disconnection, the user confirmed video and intelligible speech on the iPhone and intelligible return speech at the LiveKit test participant. Stop closed both launcher sessions successfully and removed their temporary profiles. The earlier disconnection remains unexplained; this is supervised feasibility evidence, not reliability acceptance. The user clarified that the preceding direct-in-tab attempt was still waiting for host admission; its CSP connection failure was independently confirmed, but that attempt did not establish active call media. The agent remains out of scope for this step.
 
 ## What we need
 
@@ -36,19 +36,19 @@ A local preview or a connected WebRTC status alone is not enough. If something f
 
 ## If that works: LiveKit in the same tab
 
-Add the LiveKit JS client directly to the FaceTime tab. **No separate connector page or local WebRTC hop.**
+The direct-in-tab attempt was blocked by FaceTime’s connect-src policy. **Updated with user approval:** run LiveKit in a local connector page and transfer media through a local WebRTC hop. The FaceTime page gets no room token. The launcher relays only SDP in memory; audio/video do not pass through automation RPC.
 
 ```text
 First spike:
 iPhone ↔ FaceTime Chrome tab ↔ generated video/speech + caller audio check
 
 Next step:
-iPhone ↔ FaceTime Chrome tab + LiveKit client ↔ test LiveKit room
+iPhone ↔ FaceTime Chrome tab ↔ local connector tab + LiveKit ↔ test room
 ```
 
 Use one throwaway room URL and a short-lived, room-scoped token in an untracked local config. Fixed values are fine for this prototype; no session endpoint or contract abstraction. Keep tokens out of committed source, command arguments, and logs. Never use a LiveKit API secret or model API key in the tab.
 
-The FaceTime page shares the injected script's environment, so treat its room token as exposed to that page. Accept this limited prototype tradeoff and revisit isolation before a public release.
+Only the connector page receives the room token; the FaceTime page receives generated media and local peer signaling. Both pages use separate origins within a fresh browser profile. The local hop adds encoding/CPU/latency that still needs live evaluation.
 
 Publish caller audio into the room and feed selected room audio/video into FaceTime's generated tracks. Use a controlled test participant to verify both directions and avoid feeding the connector's own output back into its input. Stop must also disconnect the LiveKit client; manually end the disposable test room afterward.
 
@@ -56,7 +56,7 @@ Publish caller audio into the room and feed selected room audio/video into FaceT
 
 ## Keep out of this spike
 
-No Windows prerequisite, cross-platform matrix, agent backend, hosted integration, session-contract framework, separate media hop, polished UI, deadline tuning, ten-cycle leak study, formal evidence package, or fresh-user study. No native worker, OBS, production integration, or publication.
+No Windows prerequisite, cross-platform matrix, agent backend, hosted integration, session-contract framework, polished UI, deadline tuning, ten-cycle leak study, formal evidence package, or fresh-user study. No native worker, OBS, production integration, or publication.
 
 Build only enough to answer the media question. Packaging, stronger credential isolation, automated failure recovery, licensing, and release testing belong to later work if the spike succeeds.
 
@@ -65,3 +65,7 @@ Build only enough to answer the media question. Packaging, stronger credential i
 The earlier research read all 60 tracked Markdown files from verified remote main of the existing Chert repository at `b0ce709d0eea7447595636fcd268ebec3759dd47`, without changing its checkout. The existing native bridge informs this work but does not prove browser injection or Mac browser guest support.
 
 Implementation references: [Apple guest flow](https://support.apple.com/en-ca/109364), [Playwright early scripts](https://playwright.dev/docs/api/class-browsercontext#browser-context-add-init-script), [generated audio](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/createMediaStreamDestination), [canvas video](https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/captureStream), and [incoming audio tracks](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/track_event).
+
+## Latest live result
+
+The separate connector path passed a supervised test on the Mac: test participant → LiveKit → connector → FaceTime → iPhone delivered visible video and intelligible canned speech; iPhone speech returned through the same path to the test participant and was heard through the Mac. Both Stop controls completed cleanup. One disconnection required manual rejoining and its cause is not established. The next implementation step is a real agent; no agent has been connected yet.

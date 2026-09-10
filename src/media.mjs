@@ -1,10 +1,12 @@
 // Runs before site scripts. Deliberately small and limited to the supervised spike.
-export function installMedia({ speech, origin = 'https://facetime.apple.com' }) {
+export function installMedia({ speech, origin = 'https://facetime.apple.com', caption = 'CHERT • GENERATED VIDEO', allowSpeech = true }) {
   if (location.origin !== origin || window.__chertSpike) return;
   const tracks = new Set();
   const peers = new Set();
   const incoming = new Map();
-  let audio, destination, video, canvas, timer, source, buffer;
+  let audio, destination, callerDestination, video, canvas, timer, source, buffer;
+  const roomInputs = new Map();
+  const stopHandlers = new Set();
   let stopped = false;
   let frames = 0;
   let requests = 0;
@@ -14,7 +16,9 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
   function ensureAudio() {
     audio ??= new AudioContext();
     destination ??= audio.createMediaStreamDestination();
+    callerDestination ??= audio.createMediaStreamDestination();
     destination.stream.getTracks().forEach(own);
+    callerDestination.stream.getTracks().forEach(own);
   }
   function ensureVideo() {
     if (video) return;
@@ -23,6 +27,11 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
     const paint = canvas.getContext('2d');
     const draw = () => {
       frames++;
+      const roomVideo = roomInputs.get('video')?.element;
+      if (roomVideo && roomVideo.readyState >= 2) {
+        paint.drawImage(roomVideo, 0, 0, 640, 360);
+        return;
+      }
       paint.fillStyle = '#102834'; paint.fillRect(0, 0, 640, 360);
       paint.fillStyle = '#8de0c4';
       paint.beginPath(); paint.arc(320, 165, 95, 0, 2 * Math.PI); paint.fill();
@@ -30,7 +39,7 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
       paint.fillRect(275, 130, 15, 20); paint.fillRect(350, 130, 15, 20);
       paint.beginPath(); paint.ellipse(320, 197, 34, 8 + 13 * Math.abs(Math.sin(frames / 5)), 0, 0, 2 * Math.PI); paint.fill();
       paint.fillStyle = 'white'; paint.font = '24px sans-serif';
-      paint.fillText(`CHERT • GENERATED VIDEO • ${frames}`, 42, 308);
+      paint.fillText(`${caption} • ${frames}`, 20, 308);
       paint.fillStyle = '#ffc876'; paint.fillRect((frames * 5) % 620, 330, 20, 12);
     };
     draw();
@@ -60,15 +69,10 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
       ['audiooutput', 'default', 'Default output'],
     ].map(([kind, deviceId, label]) => ({ kind, deviceId, label, groupId: 'chert-spike', toJSON() { return { kind, deviceId, label, groupId: this.groupId }; } })),
   });
-  const NativePeer = window.RTCPeerConnection;
-  const Peer = new Proxy(NativePeer, {
-    construct(target, args) {
-      const peer = Reflect.construct(target, args);
-      peers.add(peer);
-      peer.addEventListener('track', event => {
-        if (stopped || event.track.kind !== 'audio' || incoming.has(event.track)) return;
+  function attachCallerTrack(track) {
+        if (stopped || track.kind !== 'audio' || incoming.has(track)) return;
         ensureAudio();
-        const clone = own(event.track);
+        const clone = own(track);
         const stream = new MediaStream([clone]);
         const playback = document.createElement('audio');
         playback.muted = true; playback.srcObject = stream;
@@ -76,10 +80,17 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
         const node = audio.createMediaStreamSource(stream);
         const analyser = audio.createAnalyser(); analyser.fftSize = 512;
         node.connect(analyser); // Analysis only. Never route received audio to outgoing speech.
+        node.connect(callerDestination);
         const silentSink = audio.createGain(); silentSink.gain.value = 0;
         analyser.connect(silentSink).connect(audio.destination);
-        incoming.set(event.track, { node, analyser, silentSink, playback, samples: new Float32Array(512), clone });
-      });
+        incoming.set(track, { node, analyser, silentSink, playback, samples: new Float32Array(512), clone });
+  }
+  const NativePeer = window.RTCPeerConnection;
+  const Peer = new Proxy(NativePeer, {
+    construct(target, args) {
+      const peer = Reflect.construct(target, args);
+      peers.add(peer);
+      peer.addEventListener('track', event => attachCallerTrack(event.track));
       return peer;
     },
   });
@@ -113,9 +124,28 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
     source.connect(destination); source.start();
     // Speech is sent to FaceTime, not played through the laptop speakers.
   }
+  function detachRoomTrack(kind) {
+    const input = roomInputs.get(kind);
+    if (!input) return;
+    input.node?.disconnect(); input.element.pause(); input.element.srcObject = null;
+    roomInputs.delete(kind);
+  }
+  async function attachRoomTrack(track) {
+    if (stopped) return;
+    ensureAudio(); ensureVideo();
+    detachRoomTrack(track.kind);
+    const element = document.createElement(track.kind === 'video' ? 'video' : 'audio');
+    element.muted = true; element.playsInline = true;
+    const stream = new MediaStream([track]); element.srcObject = stream;
+    const node = track.kind === 'audio' ? audio.createMediaStreamSource(stream) : null;
+    node?.connect(destination); // Room output goes to FaceTime only, never callerDestination.
+    roomInputs.set(track.kind, { element, node });
+    await element.play();
+  }
   async function stop() {
     if (stopped) return;
     stopped = true;
+    for (const kind of [...roomInputs.keys()]) detachRoomTrack(kind);
     clearInterval(timer); clearInterval(statusTimer);
     source?.stop();
     for (const peer of peers) peer.close();
@@ -125,9 +155,13 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
       playback.pause(); playback.srcObject = null;
     }
     if (audio && audio.state !== 'closed') await audio.close();
+    await Promise.allSettled([...stopHandlers].map(handler => handler()));
     if (status) status.textContent = 'Stopped';
   }
-  const api = { snapshot, enable, play, stop };
+  const api = { snapshot, enable, play, stop, NativePeer, attachRoomTrack, detachRoomTrack, attachCallerTrack,
+    callerStream() { ensureAudio(); return callerDestination.stream; },
+    onStop(handler) { stopHandlers.add(handler); },
+  };
   Object.defineProperty(window, '__chertSpike', { value: api });
   const statusTimer = setInterval(() => {
     if (!status) return;
@@ -142,7 +176,7 @@ export function installMedia({ speech, origin = 'https://facetime.apple.com' }) 
     root.innerHTML = '<style>:host{color-scheme:light}section{font:13px system-ui;background:#fff;color:#102834;padding:14px;border:2px solid #17846b;border-radius:12px;box-shadow:0 4px 20px #0004;max-width:330px}button{font:inherit;padding:8px;margin:6px 4px 0 0;cursor:pointer}pre{white-space:pre-wrap;font:12px monospace}</style><section><strong>Chert synthetic media test</strong><p>No laptop mic or camera. Use headphones to hear the caller through FaceTime.</p><pre></pre></section>';
     status = root.querySelector('pre');
     for (const [label, action] of [
-      ['Enable audio', enable], ['Send test speech', play],
+      ['Enable audio', enable], ...(allowSpeech ? [['Send test speech', play]] : []),
       ['Stop test', async () => { await stop(); await window.__chertStop?.(); }],
     ]) {
       const button = document.createElement('button'); button.textContent = label;

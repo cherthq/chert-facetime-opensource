@@ -4,11 +4,11 @@ Put your AI agent on FaceTime, with a voice and a moving avatar.
 
 The idea is simple: a browser joins your FaceTime link as a guest. Instead of sending your laptop's microphone and webcam, it sends your agent's speech and avatar. Your voice travels back to the agent so you can have a conversation from your iPhone.
 
-**Status: synthetic-media spike.** The ordinary Chrome guest joined successfully on the available Mac. Generated video and speech plus an incoming-audio meter are implemented and pass a local WebRTC check. In the first live Mac test, the user confirmed moving video and clear generated speech on the iPhone. The receive-audio meter responded, and Stop closed Chrome and removed its temporary profile. Caller-speech intelligibility at the adapter still needs a separate check. LiveKit and the agent connection are not built yet. This is an unofficial project, not an Apple-supported integration.
+**Status: synthetic-media spike.** The ordinary Chrome guest joined successfully on the available Mac. Generated video and speech plus an incoming-audio meter are implemented and pass a local WebRTC check. In the first live Mac test, the user confirmed moving video and clear generated speech on the iPhone. The receive-audio meter responded, and Stop closed Chrome and removed its temporary profile. Caller-speech intelligibility at the adapter still needs a separate check. The standalone LiveKit test participant connected successfully, but FaceTime’s Content Security Policy blocks the direct-in-tab LiveKit connection. The implementation now uses a separate local connector and WebRTC hop; local tests pass and the hop connects to the actual FaceTime page. In a supervised live test, the user confirmed video and speech on the iPhone and caller speech returning to the LiveKit test participant. Both test sessions stopped successfully. One disconnection required a manual rejoin; reliability is not established. The AI agent is not built yet. This is an unofficial project, not an Apple-supported integration.
 
 ## Run the first check
 
-With Node 20+ and Google Chrome installed:
+With Node 22.22+ and Google Chrome installed (run `nvm use` if you use nvm):
 
 ```sh
 npm ci
@@ -26,6 +26,32 @@ Run `npm run synthetic`, paste your FaceTime link at the hidden prompt, and cont
 In the small Chert panel, click **Enable audio**, then **Send test speech**. Confirm that the iPhone sees the moving face and hears the phrase. Speak from the iPhone and check that **Caller tracks** and **level** respond. Use headphones for normal FaceTime playback. Click **Stop test** to end the test and close this Chrome session.
 
 `npm test` verifies generated audio/video through a local WebRTC connection, received video motion, the incoming-audio meter, and media teardown. It does not place a FaceTime call. This first hook uses fixed media settings and is not a general camera-device emulator.
+
+## Test the LiveKit connection
+
+**Current approach:** FaceTime blocks direct LiveKit signaling. The launcher now opens a local connector tab alongside the FaceTime tab and relays media through WebRTC. Room credentials stay in the connector tab. This route passed a supervised live test for video, speech in both directions, and Stop. One manual rejoin was needed after a disconnection.
+
+Use your LiveKit project's **WebSocket URL**, **API key**, and **API secret** from the LiveKit Cloud dashboard. Run this in your own terminal:
+
+```sh
+nvm use
+npm ci
+npm run tokens
+```
+
+The helper asks for the project URL and hidden API credentials. It creates a unique disposable room name and two one-hour join tokens in ignored `.local/livekit.json` and `.local/peer.json`. It signs tokens locally; it does not save the API secret or provision an agent. The server checks the credentials when you connect. See [LiveKit token documentation](https://docs.livekit.io/frontends/reference/tokens-grants/).
+
+Then use two terminals, with Node 22 selected in each:
+
+1. Run `npm run peer`. In its browser window, click **Connect LiveKit**. This test participant publishes generated media and can play caller audio through headphones.
+2. Run `npm run livekit`. Paste the FaceTime link, join in Chrome, and admit the guest on the iPhone. **After the iPhone admits the guest**, switch to the **Local LiveKit connector** tab and click **Connect LiveKit** there. A Leave button alone is not proof that admission finished.
+3. In the **test participant** window, click **Send test speech**. Confirm the iPhone hears it and sees the **LIVEKIT TEST PEER** caption moving. The FaceTime tab's waiting graphic does not count as room video.
+4. Speak from the iPhone. In the test participant, click **Listen to caller** if needed and confirm intelligible speech through headphones. There is no microphone capture in either test window.
+5. Click **Stop test** in both windows. Confirm both participants leave the room. Check the LiveKit dashboard if either process crashes; token expiry alone does not disconnect an existing session.
+
+The FaceTime tab publishes a mix of its incoming audio tracks as `facetime-caller`; this spike assumes one human caller. It accepts room output only from the configured test participant. Room media uses separate audio routes and bypasses the FaceTime peer observer to prevent feedback. No AI agent or recording is involved.
+
+**Prototype credential boundary:** the room token runs only in the local connector page. The FaceTime page gets media and signaling, not that token. Use a disposable test room. Keep API secrets out of page scripts, command arguments, and committed files. For an existing token, use the same three fields as the generated config: `url`, `token`, and `targetIdentity`; tokens must expire within one hour and explicitly allow room join, publish, and subscribe.
 
 ## What you would build
 

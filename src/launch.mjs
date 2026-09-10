@@ -5,14 +5,19 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Writable } from 'node:stream';
 import { installMedia } from './media.mjs';
+import { livekitInit, validateConfig } from './bundle.mjs';
+import { connectHop } from './hop.mjs';
 
 // Join and permission decisions remain manual in both modes.
 const flags = process.argv.slice(2);
-if (flags.some(flag => !['--smoke', '--inspect', '--synthetic'].includes(flag))) {
+if (flags.some(flag => !['--smoke', '--inspect', '--synthetic', '--livekit', '--peer'].includes(flag))) {
   console.error('Usage: npm start [-- --inspect --synthetic] | npm run smoke. Paste links at the prompt, not in arguments.');
   process.exit(1);
 }
 const smoke = flags.includes('--smoke');
+const peer = flags.includes('--peer');
+const livekit = peer || flags.includes('--livekit');
+const synthetic = livekit || flags.includes('--synthetic');
 let muted = false;
 const output = new Writable({
   write(chunk, encoding, done) {
@@ -32,8 +37,13 @@ async function stop() {
   stopPromise = (async () => {
     input.close();
     const ownedContext = context ?? await launching?.catch(() => undefined);
-    if (flags.includes('--synthetic')) {
-      await Promise.allSettled((ownedContext?.pages() ?? []).map(page => page.evaluate(() => window.__chertSpike?.stop())));
+    if (synthetic) {
+      let timeout;
+      await Promise.race([
+        Promise.allSettled((ownedContext?.pages() ?? []).map(page => page.evaluate(() => window.__chertSpike?.stop()))),
+        new Promise(resolve => { timeout = setTimeout(resolve, 3000); }),
+      ]);
+      clearTimeout(timeout);
     }
     await ownedContext?.close();
     if (profile) await rm(profile, { recursive: true, force: true });
@@ -49,6 +59,13 @@ process.on('SIGTERM', exitOnSignal);
 input.on('SIGINT', exitOnSignal);
 
 try {
+  let roomInit;
+  if (livekit) {
+    let config;
+    try { config = validateConfig(JSON.parse(await readFile(new URL(peer ? '../.local/peer.json' : '../.local/livekit.json', import.meta.url), 'utf8'))); }
+    catch { console.error('LiveKit config missing or invalid. Run npm run tokens to create fresh local test credentials.'); throw new Error(); }
+    roomInit = await livekitInit(config, peer, peer ? undefined : 'https://chert-connector.test');
+  }
   profile = await mkdtemp(join(tmpdir(), 'chert-guest-'));
   launching = chromium.launchPersistentContext(profile, {
     channel: 'chrome',
@@ -67,23 +84,41 @@ try {
     await rm(profile, { recursive: true, force: true });
   } else {
     context.on('close', () => { void stop().catch(() => { process.exitCode = 1; }); });
-    if (flags.includes('--synthetic')) {
+    if (synthetic) {
       await context.exposeBinding('__chertStop', ({ frame }) => {
-        if (new URL(frame.url()).origin === 'https://facetime.apple.com') void stop();
+        const allowed = peer ? ['https://chert-spike.test'] : ['https://facetime.apple.com', 'https://chert-connector.test'];
+        if (allowed.includes(new URL(frame.url()).origin)) void stop().catch(() => { process.exitCode = 1; });
       });
-      const speech = (await readFile(new URL('../assets/speech.wav', import.meta.url))).toString('base64');
-      await context.addInitScript(installMedia, { speech });
+      if (roomInit && peer) await context.addInitScript({ content: roomInit });
+      else {
+        const speech = (await readFile(new URL('../assets/speech.wav', import.meta.url))).toString('base64');
+        await context.addInitScript(installMedia, { speech, allowSpeech: !livekit, caption: livekit ? 'WAITING FOR CONNECTOR' : 'CHERT • GENERATED VIDEO' });
+      }
       console.log('Synthetic mode: generated camera and speech; no real mic/camera fallback.');
     }
     const page = context.pages()[0] ?? await context.newPage();
+    let connectorPage;
+    if (livekit && !peer) {
+      await context.route('https://chert-connector.test/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Chert local connector</title><h1 style="margin-top:260px">Local LiveKit connector</h1><p>Keep this window open. After the iPhone admits the FaceTime guest, click Connect LiveKit here. Stop test closes both tabs.</p>' }));
+      connectorPage = await context.newPage();
+      await connectorPage.addInitScript({ content: roomInit });
+      connectorPage.on('close', () => { void stop().catch(() => { process.exitCode = 1; }); });
+      await connectorPage.goto('https://chert-connector.test');
+    }
     page.on('close', () => { void stop().catch(() => { process.exitCode = 1; }); });
-    await page.setContent('<title>Chert guest — baseline</title><h1>Chrome is ready</h1><p>Paste a FaceTime link in the terminal. Join and admission remain manual.</p><p>This first check uses ordinary browser media permissions. No fake camera or microphone is installed yet.</p><p>Return to the terminal and press Enter to stop after opening the link, or close this window.</p>');
+    await page.setContent(`<title>Chert guest — baseline</title><h1>Chrome is ready</h1><p>Paste a FaceTime link in the terminal. Join and admission remain manual.</p><p>${synthetic ? 'Generated media mode. Real mic and camera acquisition is replaced.' : 'Baseline mode uses ordinary browser media permissions.'}</p><p>Return to the terminal and press Enter to stop after opening the link, or close this window.</p>`);
     console.log(`Fresh visible Chrome opened (${context.browser()?.version() ?? 'installed Chrome'}).`);
     if (flags.includes('--inspect')) {
       const port = (await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0];
       console.log(`Local inspection port: ${port}`);
     }
-    if (smoke) {
+    if (peer) {
+      await context.route('https://chert-spike.test/**', route => route.fulfill({ contentType: 'text/html', body: '<title>Chert LiveKit test peer</title><h1 style="margin-top:260px">LiveKit test participant</h1><p>Connect LiveKit, then Send test speech. Use headphones to hear the caller without acoustic feedback. Stop both test windows when done.</p>' }));
+      await page.goto('https://chert-spike.test');
+      console.log('Test participant ready. Click Connect LiveKit. Press Enter here to stop.');
+      input.once('line', () => { void stop(); });
+      input.on('close', () => { void stop(); });
+    } else if (smoke) {
       if (await page.title() !== 'Chert guest — baseline') throw new Error('Smoke check failed');
       console.log('PASS: visible Chrome launched and rendered the local baseline page. No FaceTime call attempted.');
       await stop();
@@ -105,9 +140,19 @@ try {
         console.log('\nOpening FaceTime. Click Join yourself if a browser guest flow is offered.');
         console.log('Press Enter here to Stop, or close the Chrome window.');
         input.once('line', () => { void stop().catch(() => { process.exitCode = 1; }); });
-        try { await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
+        try {
+          await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          if (connectorPage) {
+            await page.waitForFunction(() => !!window.__chertSpike);
+            await page.getByRole('button', { name: 'Enable audio', exact: true }).click();
+            await connectorPage.getByRole('button', { name: 'Enable audio', exact: true }).click();
+            await connectHop(page, connectorPage);
+            console.log('Local media link connected. Join FaceTime and wait for iPhone admission, then click Connect LiveKit in the connector tab.');
+            await page.bringToFront();
+          }
+        }
         catch {
-          if (!stopping) console.log('Navigation did not finish. Check the Chrome window; the link is omitted from diagnostics.');
+          if (!stopping) console.log('Navigation or local media setup did not finish. Check Chrome; private details are omitted. Stop and restart before retrying.');
         }
       });
       input.on('close', () => { void stop().catch(() => { process.exitCode = 1; }); });
