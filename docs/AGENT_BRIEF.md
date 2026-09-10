@@ -1,5 +1,7 @@
 # Chert FaceTime Guest — agent handoff
 
+> Historical planning brief. Its original instructions are preserved below; the current plan and results are in [PLAN.md](PLAN.md). Implementation has since begun.
+
 ## Your assignment
 
 Work in `/Users/garygao/chert-facetime-opensource`.

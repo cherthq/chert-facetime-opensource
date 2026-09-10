@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { initializeLogger, voice } from '@livekit/agents';
 import { realtime } from '@livekit/agents-plugin-openai';
 import { Room, RoomEvent, VideoSource, LocalVideoTrack, TrackSource, dispose } from '@livekit/rtc-node';
-import { validateConfig } from './bundle.mjs';
+import { validateConfig } from '../src/bundle.mjs';
 import { avatarFrame, WIDTH, HEIGHT } from './avatar.mjs';
 
 initializeLogger({ pretty: false, level: 'silent' });
@@ -26,7 +26,7 @@ process.on('SIGINT', () => { void stop('local Stop'); });
 process.on('SIGTERM', () => { void stop('local Stop'); });
 
 try {
-  const settings = JSON.parse(await readFile(new URL('../examples/agent.json', import.meta.url), 'utf8'));
+  const settings = JSON.parse(await readFile(new URL('./agent.json', import.meta.url), 'utf8'));
   if (!settings.instructions || !settings.model || !settings.voice || !Number.isFinite(settings.maxMinutes) || settings.maxMinutes < 1 || settings.maxMinutes > 30) throw new Error('Invalid settings');
   if (process.argv.includes('--check')) {
     model = new realtime.RealtimeModel({ apiKey: 'offline-check-only', model: settings.model, voice: settings.voice, inputAudioTranscription: null });

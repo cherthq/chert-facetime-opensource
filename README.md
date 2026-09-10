@@ -49,7 +49,7 @@ The agent’s speech and video travel back along the same path.
 
 `launch.mjs` opens this setup and closes it when you press Stop. One supporting file, `bundle.mjs`, packages the code that runs inside the tabs.
 
-**The agent is separate.** Our optional `agent.mjs` listens and answers using OpenAI, while `avatar.mjs` draws its moving face. An experienced developer can supply their own agent instead.
+**The agent is separate.** Our optional `examples/agent.mjs` listens and answers using OpenAI, while `examples/avatar.mjs` draws its moving face. An experienced developer can supply their own agent instead.
 
 The other files help with credentials, configuration, documentation, and checking that these core pieces work.
 
@@ -145,8 +145,21 @@ Edit [examples/agent.json](examples/agent.json) to change the prompt, voice, mod
 
 `npm run agent:check` initializes the SDK and native avatar frames without calling LiveKit or OpenAI. The first supervised conversation, interruption, and Stop check passed. This is prototype feasibility evidence, not a production reliability guarantee.
 
+## Repository layout
+
+| Folder | What belongs here |
+| --- | --- |
+| `src/` | The browser connector, media routing, and browser bundling. |
+| `examples/` | The optional starter agent, animated face, and `agent.json` settings. |
+| `scripts/` | Local setup helpers for LiveKit tokens and the OpenAI key. |
+| `tests/` | Local checks for media, room routing, and the link between tabs. |
+| `assets/` | The canned speech fixture and its provenance. |
+| `docs/` | The implementation plan, test results, and original project brief. |
+
+Package files and Node/Git settings stay at the root. Credentials stay in ignored `.local/`; installed dependencies stay in ignored `node_modules/`. The `npm run` commands are unchanged.
+
 ## What's next
 
 Simplify startup, investigate the earlier disconnection, and test longer calls and recovery. Before wider sharing, review the license, dependencies, secrets, and setup documentation.
 
-See [PLAN.md](PLAN.md) for the implementation details and observed results.
+See [PLAN.md](docs/PLAN.md) for the implementation details and observed results.

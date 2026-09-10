@@ -8,16 +8,16 @@
   },
   "scripts": {
     "start": "node src/launch.mjs",
-    "check": "node --check src/launch.mjs && node --check src/media.mjs && node --check src/livekit.mjs && node --check src/token.mjs && node --check src/bundle.mjs && node --check src/hop.mjs && node --check src/agent.mjs && node --check src/avatar.mjs && node --check src/agent-setup.mjs",
+    "check": "node --check src/launch.mjs && node --check src/media.mjs && node --check src/livekit.mjs && node --check scripts/token.mjs && node --check src/bundle.mjs && node --check src/hop.mjs && node --check examples/agent.mjs && node --check examples/avatar.mjs && node --check scripts/agent-setup.mjs",
     "test": "node tests/media.mjs && node tests/livekit.mjs && node tests/hop.mjs",
     "synthetic": "node src/launch.mjs --synthetic",
     "smoke": "node src/launch.mjs --smoke",
-    "tokens": "node src/token.mjs",
+    "tokens": "node scripts/token.mjs",
     "livekit": "node src/launch.mjs --livekit",
     "peer": "node src/launch.mjs --peer",
-    "agent:setup": "node src/agent-setup.mjs",
-    "agent": "node src/agent.mjs",
-    "agent:check": "node src/agent.mjs --check"
+    "agent:setup": "node scripts/agent-setup.mjs",
+    "agent": "node examples/agent.mjs",
+    "agent:check": "node examples/agent.mjs --check"
   },
   "dependencies": {
     "@livekit/agents": "1.8.0",
