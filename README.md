@@ -20,6 +20,39 @@ Your iPhone ↔ Browser guest + connector ↔ LiveKit room ↔ Your AI agent
 
 We include a starter agent so you can try the whole experience. [examples/agent.json](examples/agent.json) only customizes **that starter**. If you already build LiveKit agents, keep your own agent code and configure it however you normally do.
 
+## How this works
+
+The connector has **four core files**:
+
+| File | Simple explanation |
+| --- | --- |
+| `src/launch.mjs` | **Starts and stops everything in the browser.** Opens the FaceTime tab and the local connector tab. |
+| `src/media.mjs` | **Supplies the agent’s video and speech instead of your webcam and microphone**, and receives the caller’s audio. |
+| `src/hop.mjs` | **Connects the two tabs.** Carries media between FaceTime and the local connector because FaceTime blocks direct LiveKit connections. |
+| `src/livekit.mjs` | **Connects to the agent’s room.** Sends caller audio into LiveKit and receives the agent’s speech and video. |
+
+When you speak, the audio travels like this:
+
+```text
+You on your iPhone
+       ↓
+FaceTime tab                 media.mjs
+       ↓
+Local connector tab          hop.mjs
+       ↓
+LiveKit room                 livekit.mjs
+       ↓
+Your agent
+```
+
+The agent’s speech and video travel back along the same path.
+
+`launch.mjs` opens this setup and closes it when you press Stop. One supporting file, `bundle.mjs`, packages the code that runs inside the tabs.
+
+**The agent is separate.** Our optional `agent.mjs` listens and answers using OpenAI, while `avatar.mjs` draws its moving face. An experienced developer can supply their own agent instead.
+
+The other files help with credentials, configuration, documentation, and checking that these core pieces work.
+
 ## Already have a LiveKit agent?
 
 The intended flow is:
