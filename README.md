@@ -4,7 +4,52 @@ Put your AI agent on FaceTime, with a voice and a moving avatar.
 
 The idea is simple: a browser joins your FaceTime link as a guest. Instead of sending your laptop's microphone and webcam, it sends your agent's speech and avatar. Your voice travels back to the agent so you can have a conversation from your iPhone.
 
-**Status: synthetic-media spike.** The ordinary Chrome guest joined successfully on the available Mac. Generated video and speech plus an incoming-audio meter are implemented and pass a local WebRTC check. In the first live Mac test, the user confirmed moving video and clear generated speech on the iPhone. The receive-audio meter responded, and Stop closed Chrome and removed its temporary profile. Caller-speech intelligibility at the adapter still needs a separate check. The standalone LiveKit test participant connected successfully, but FaceTime’s Content Security Policy blocks the direct-in-tab LiveKit connection. The implementation now uses a separate local connector and WebRTC hop; local tests pass and the hop connects to the actual FaceTime page. In a supervised live test, the user confirmed video and speech on the iPhone and caller speech returning to the LiveKit test participant. Both test sessions stopped successfully. One disconnection required a manual rejoin; reliability is not established. A local OpenAI Realtime agent and simple speaking avatar are now implemented; a supervised live conversation and interruptions were confirmed by the user. Stop closed the browser and automatically shut down the agent. This is an unofficial project, not an Apple-supported integration.
+## Your agent and our connector are separate
+
+**We are not hosting your agent for you.** There are two separate pieces:
+
+- **Your agent:** its code, personality, voice, model, and avatar. You run it locally or deploy it yourself, including through LiveKit.
+- **Our connector:** runs on your laptop and carries audio/video between FaceTime and a LiveKit room. The CLI starts this connection; it does not require you to build your agent through our tool.
+
+LiveKit hosts the room that carries the media. Your agent is a separate process that connects to that room and decides what to say.
+
+```text
+Your iPhone ↔ Browser guest + connector ↔ LiveKit room ↔ Your AI agent
+                 on your laptop                      local or deployed
+```
+
+We include a starter agent so you can try the whole experience. [examples/agent.json](examples/agent.json) only customizes **that starter**. If you already build LiveKit agents, keep your own agent code and configure it however you normally do.
+
+## Already have a LiveKit agent?
+
+The intended flow is:
+
+1. Run or deploy your own LiveKit agent.
+2. Have that agent join a room.
+3. Give our connector access to the same room and identify the agent participant.
+4. Join the FaceTime link in Chrome and admit the browser guest on your iPhone.
+5. Talk to your agent through FaceTime.
+
+You do not need our starter agent or its OpenAI setup if you bring your own. Your model keys stay with your agent. The connector needs a short-lived room token, not your model API keys.
+
+**Current limitation:** we have tested the included starter. Other agents still need compatibility checks, especially for audio/video publications, participant selection, and dispatch into the correct room. The connector does not deploy or dispatch your agent, or automatically shut down an independently hosted agent; your backend owns that lifecycle.
+
+## Try the included starter today
+
+1. **Download the project** and install its dependencies with `npm ci`. You need Node 22.22+, Chrome, a LiveKit project, an OpenAI API key, and an iPhone with FaceTime.
+2. **Add your credentials:** run `npm run tokens` for LiveKit, then `npm run agent:setup` for OpenAI. Enter credentials at the local prompts.
+3. **Customize the starter:** edit [examples/agent.json](examples/agent.json) to change its personality, voice, and model.
+4. **Start the agent:** run `npm run agent`.
+5. **Start the browser connector:** in another terminal, run `npm run livekit` and paste a FaceTime link created on your iPhone.
+6. **Join and admit:** click **Join** in Chrome, then admit the guest on your iPhone.
+7. **Connect and talk:** click **Connect LiveKit** in the local connector tab. The starter agent greets you on FaceTime with a moving face.
+8. **Finish:** click **Stop test**. The browser and included starter agent shut down.
+
+Your laptop stays running throughout. A planned improvement is to combine the starter's agent and connector launch into one command; bringing your own agent will remain a separate option.
+
+**Status: working prototype on the tested Mac.** Video, two-way conversation, interruptions, and clean shutdown passed a supervised test. One earlier disconnection required a manual rejoin; reliability and other platforms are not established. This is an unofficial project, not an Apple-supported integration.
+
+The sections below cover individual checks and more detailed setup.
 
 ## Run the first check
 
@@ -67,39 +112,8 @@ Edit [examples/agent.json](examples/agent.json) to change the prompt, voice, mod
 
 `npm run agent:check` initializes the SDK and native avatar frames without calling LiveKit or OpenAI. The first supervised conversation, interruption, and Stop check passed. This is prototype feasibility evidence, not a production reliability guarantee.
 
-## What you would build
-
-Build a realtime agent for your hackathon idea: a character, tutor, coach, or something else. You control its instructions, model, voice, tools, and avatar in **your agent backend**.
-
-This project would provide the connector that lets people talk to that agent through FaceTime. You wouldn't need to build the FaceTime connection yourself.
-
-## How you would use it
-
-1. **Set up your agent.** Start from the planned example, customize it, and run it locally or on a server. It connects to your LiveKit Cloud project or self-hosted LiveKit server.
-2. **Point the launcher at your backend.** Your backend provides a short-lived session credential and identifies the agent's audio and video. Your model API keys stay on your backend.
-3. **Create a FaceTime link on your iPhone.** Paste the link into the local launcher.
-4. **Join and admit.** The launcher opens a dedicated Chrome session on your laptop. Click Join, then admit the guest on your iPhone.
-5. **Talk to your agent.** You hear its replies and see its moving avatar. Keep the laptop and browser running. Press Stop when finished.
-
-An optional Chert-hosted agent would let you try the experience without deploying an agent backend. The developer-owned example is intended to work without a Chert account.
-
-These are the intended steps, not installation instructions for an existing release.
-
-## How the pieces fit
-
-```text
-Your iPhone ↔ Browser guest + connector ↔ LiveKit room ↔ Your AI agent
-                 on your laptop                         local or hosted
-```
-
-- **The connector** joins FaceTime and carries audio and video between the call and LiveKit.
-- **LiveKit** hosts the room that transports the media. It does not supply the agent's intelligence.
-- **Your agent** is a separate process that listens and responds. Its backend provides the connector with access to a session.
-
-Think of it as: **build a LiveKit agent, then give it a way onto FaceTime.** The planned example will show the small session interface needed to connect the two.
-
 ## What's next
 
-Prove generated speech, moving video, caller audio, and reliable Stop behavior in a real browser call. Then build the agent example and easy setup flow. The goal is roughly ten minutes after prerequisites, without OBS, physical audio loopback, or a dedicated native Mac worker.
+Simplify startup, investigate the earlier disconnection, and test longer calls and recovery. Before wider sharing, review the license, dependencies, secrets, and setup documentation.
 
-See [PLAN.md](PLAN.md) for the Mac-first spike and the next steps if it works.
+See [PLAN.md](PLAN.md) for the implementation details and observed results.
