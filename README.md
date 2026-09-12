@@ -3,7 +3,7 @@
 <p align="center"><strong>An open-source CLI/SDK for deploying real-time video agents to FaceTime</strong></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.1.0-blue" alt="version 0.1.0">
+  <img src="https://img.shields.io/badge/version-0.1.1-blue" alt="version 0.1.1">
   <a href="https://trychert.com/facetime"><img src="https://img.shields.io/badge/Chert-Website-black" alt="Chert Website"></a>
   <a href="https://www.ycombinator.com/companies/chert"><img src="https://img.shields.io/badge/Y%20Combinator-Spring%202026-ff6600" alt="Y Combinator Spring 2026"></a>
 </p>
@@ -12,6 +12,12 @@ Chert FaceTime Opensource lets any builder put their AI agent on a live FaceTime
 
 > [!NOTE]
 > For managed outbound calling, incoming call monitoring and acceptance, and media bridging through an API, use [Chert's managed FaceTime service](https://trychert.com/facetime).
+
+## Demo
+
+Watch a LiveKit agent connect to FaceTime through the Chert CLI.
+
+https://github.com/user-attachments/assets/c9d4b252-2afd-4a8e-8a5b-5681e422c918
 
 ## How to use
 
@@ -92,7 +98,7 @@ The connector has **four core files**:
 
 Your voice travels from FaceTime through the connector to your agent's LiveKit room. The agent's speech and video travel back along the same path. The CLI is a terminal interface to this same SDK. Your agent runs separately.
 
-**Status:** experimental, with a successful live conversation on the tested Mac. The packaged CLI and SDK passed offline checks but still need a live call check. Longer-call reliability, other platforms, and other agents remain unverified. This is an unofficial project, not an Apple-supported integration.
+**Status:** experimental, with a successful live conversation on the tested Mac. The updated local CLI passed a supervised FaceTime call with agent audio and video, alongside offline SDK and media checks. Longer-call reliability, other platforms, and other agents remain unverified. This is an unofficial project, not an Apple-supported integration.
 
 See the [detailed guide](docs/GUIDE.md) for the optional starter agent, configuration, tests, and development background. Licensed under [Apache-2.0](LICENSE).
 
