@@ -17,7 +17,7 @@ Chert FaceTime Opensource lets any builder put their AI agent on a live FaceTime
 
 Watch a LiveKit agent connect to FaceTime through the Chert CLI.
 
-https://github.com/user-attachments/assets/c9d4b252-2afd-4a8e-8a5b-5681e422c918
+https://github.com/user-attachments/assets/1fde265d-5e53-4d98-be87-b64ea07eeeff
 
 ## How to use
 
